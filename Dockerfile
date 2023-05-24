@@ -1,22 +1,33 @@
-FROM debian
-RUN apt update
-RUN DEBIAN_FRONTEND=noninteractive apt install ssh wget npm apache2 php php-curl php-cli php-fpm php-json php-common php-mysql php-zip php-gd php-mbstring  php-xml php-pear php-bcmath  -y
-RUN  npm install -g wstunnel
-RUN mkdir /run/sshd 
-RUN a2enmod proxy
-RUN a2enmod proxy_http
-RUN a2enmod proxy_wstunnel
-RUN a2enmod  rewrite
-RUN wget https://raw.githubusercontent.com/uncleluogithub/areyouok/main/000-default.conf
-RUN rm /etc/apache2/sites-available/000-default.conf
-RUN mv 000-default.conf /etc/apache2/sites-available
-RUN echo 'You can play the awesome Cloud NOW! - Message from Uncle LUO!' >/var/www/html/index.html
-RUN echo 'wstunnel -s 0.0.0.0:8989 & ' >>/luo.sh
-RUN echo 'service mysql restart' >>/luo.sh
-RUN echo 'service apache2 restart' >>/luo.sh
-RUN echo '/usr/sbin/sshd -D' >>/luo.sh
-RUN echo 'PermitRootLogin yes' >>  /etc/ssh/sshd_config 
-RUN echo root:uncleluo|chpasswd
-RUN chmod 755 /luo.sh
+# 使用基础镜像
+FROM ubuntu:20.04
+
+# 设置环境变量
+ENV DEBIAN_FRONTEND noninteractive
+
+# 更新软件包列表并安装必要的软件
+RUN apt-get update \
+    && apt-get install -y apache2 mysql-server php libapache2-mod-php php-mysql php-curl php-gd php-intl php-mbstring php-xml php-xmlrpc php-zip curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装WordPress
+RUN curl -O https://wordpress.org/latest.tar.gz \
+    && tar -xzf latest.tar.gz -C /var/www/html \
+    && rm latest.tar.gz
+
+# 设置WordPress配置
+COPY wp-config.php /var/www/html/wordpress/
+
+# 设置MySQL数据库
+RUN service mysql start \
+    && mysql -e "CREATE DATABASE wordpress; GRANT ALL PRIVILEGES ON wordpress.* TO 'wordpress'@'localhost' IDENTIFIED BY 'password'; FLUSH PRIVILEGES;" \
+    && service mysql stop
+
+# 设置Apache2
+RUN chown -R www-data:www-data /var/www/html \
+    && a2enmod rewrite
+
+# 暴露端口
 EXPOSE 80
-CMD  /luo.sh
+
+# 启动Apache2服务
+CMD ["apache2ctl", "-D", "FOREGROUND"]
