@@ -1,2 +1,2 @@
 # 使用基础镜像
-FROM ubuntu
+FROM nginx
